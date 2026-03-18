@@ -3,8 +3,6 @@ package main
 import (
 	"fmt"
 	"log"
-	"os"
-	"os/signal"
 
 	"github.com/bootdotdev/learn-pub-sub-starter/internal/gamelogic"
 	"github.com/bootdotdev/learn-pub-sub-starter/internal/pubsub"
@@ -34,8 +32,45 @@ func main() {
 
 	fmt.Printf("Queue %v declared and bound!\n", queue.Name)
 
-	signalChan := make(chan os.Signal, 1)
-	signal.Notify(signalChan, os.Interrupt)
-	<-signalChan
-	fmt.Print("peril client shutting down...")
+	gs := gamelogic.NewGameState(username)
+
+	for {
+		inputs := gamelogic.GetInput()
+		if len(inputs) == 0 {
+			continue
+		}
+
+		switch inputs[0] {
+		case "spawn":
+			err = gs.CommandSpawn(inputs)
+			if err != nil {
+				fmt.Printf("Issue spawning unit: %v", err)
+				continue
+			}
+		case "move":
+			move, err := gs.CommandMove(inputs)
+			if err != nil {
+				fmt.Printf("Issue moving unit: %v", err)
+				continue
+			}
+			fmt.Printf("move to %s", move.ToLocation)
+		case "status":
+			gs.CommandStatus()
+		case "help":
+			gamelogic.PrintClientHelp()
+		case "spam":
+			fmt.Println("Spamming not allowed yet!")
+		case "quit":
+			gamelogic.PrintQuit()
+			return
+		default:
+			fmt.Println("No such command")
+			continue
+		}
+	}
+
+	// signalChan := make(chan os.Signal, 1)
+	// signal.Notify(signalChan, os.Interrupt)
+	// <-signalChan
+	// fmt.Print("peril client shutting down...")
 }
