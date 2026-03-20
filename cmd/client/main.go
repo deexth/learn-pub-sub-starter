@@ -14,6 +14,7 @@ func main() {
 	rabbit := "amqp://guest:guest@localhost:5672/"
 
 	conn, err := amqp.Dial(rabbit)
+
 	if err != nil {
 		log.Fatalf("issue creating client connection: %v", err)
 	}

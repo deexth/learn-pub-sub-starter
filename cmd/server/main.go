@@ -24,14 +24,18 @@ func main() {
 		log.Fatalf("issue creating channel: %v", err)
 	}
 
-	err = pubsub.PublishJSON(ch, routing.ExchangePerilDirect, routing.PauseKey, routing.PlayingState{
-		IsPaused: true,
-	})
+	_, queue, err := pubsub.DeclareAndBind(
+		conn,
+		routing.ExchangePerilTopic,
+		routing.GameLogSlug,
+		routing.GameLogSlug+".*",
+		pubsub.Durable,
+	)
 	if err != nil {
 		log.Fatal(err)
 	}
 
-	fmt.Println("amqp connection was created successfully...")
+	fmt.Printf("Queue %v declared and bound!\n", queue.Name)
 
 	gamelogic.PrintClientHelp()
 
