@@ -24,16 +24,25 @@ func main() {
 		log.Fatalln(err)
 	}
 
+	gs := gamelogic.NewGameState(username)
+
 	queueName := routing.PauseKey + "." + username
 
-	_, queue, err := pubsub.DeclareAndBind(conn, routing.ExchangePerilDirect, queueName, routing.PauseKey, "transient")
+	// _, queue, err := pubsub.DeclareAndBind(conn, routing.ExchangePerilDirect, queueName, routing.PauseKey, "transient")
+	err = pubsub.SubscribeJSON(
+		conn,
+		routing.ExchangePerilDirect,
+		queueName,
+		routing.PauseKey,
+		pubsub.Transient,
+		handlerPause(gs),
+	)
 	if err != nil {
 		log.Fatalln(err)
 	}
 
-	fmt.Printf("Queue %v declared and bound!\n", queue.Name)
-
-	gs := gamelogic.NewGameState(username)
+	// fmt.Printf("Queue %v declared and bound!\n", queue.Name)
+	fmt.Println("Subscribed to json...")
 
 	for {
 		inputs := gamelogic.GetInput()
@@ -74,4 +83,12 @@ func main() {
 	// signal.Notify(signalChan, os.Interrupt)
 	// <-signalChan
 	// fmt.Print("peril client shutting down...")
+}
+
+func handlerPause(gs *gamelogic.GameState) func(routing.PlayingState) {
+	return func(ps routing.PlayingState) {
+		defer fmt.Print(">")
+
+		gs.HandlePause(ps)
+	}
 }
