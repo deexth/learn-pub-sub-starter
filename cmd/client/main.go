@@ -105,6 +105,19 @@ func main() {
 				continue
 			}
 			fmt.Printf("move to %s", move.ToLocation)
+		case "war":
+			err := pubsub.SubscribeJSON(
+				conn,
+				routing.ExchangePerilTopic,
+				"war",
+				routing.WarRecognitionsPrefix+".*",
+				pubsub.Durable,
+				handlerWar(gs),
+			)
+			if err != nil {
+				fmt.Println(err)
+				continue
+			}
 		case "status":
 			gs.CommandStatus()
 		case "help":

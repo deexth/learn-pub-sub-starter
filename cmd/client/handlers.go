@@ -32,7 +32,7 @@ func handlerMove(gs *gamelogic.GameState, ch *amqp.Channel) func(gamelogic.ArmyM
 			if err := pubsub.PublishJSON(
 				ch,
 				routing.ExchangePerilTopic,
-				"$"+routing.WarRecognitionsPrefix+".$"+gs.GetUsername(),
+				routing.WarRecognitionsPrefix+"."+gs.GetUsername(),
 				gamelogic.RecognitionOfWar{
 					Attacker: mv.Player,
 					Defender: gs.GetPlayerSnap(),
@@ -45,6 +45,29 @@ func handlerMove(gs *gamelogic.GameState, ch *amqp.Channel) func(gamelogic.ArmyM
 		}
 
 		fmt.Println("error: unknown moveOutcome")
+		return pubsub.NackDiscard
+	}
+}
+
+func handlerWar(gs *gamelogic.GameState) func(gamelogic.RecognitionOfWar) pubsub.AckType {
+	return func(rw gamelogic.RecognitionOfWar) pubsub.AckType {
+		defer fmt.Print(">")
+
+		outcome, _, _ := gs.HandleWar(rw)
+
+		switch outcome {
+		case gamelogic.WarOutcomeDraw:
+			return pubsub.Ack
+		case gamelogic.WarOutcomeNoUnits:
+			return pubsub.NackDiscard
+		case gamelogic.WarOutcomeNotInvolved:
+			return pubsub.NackRequeue
+		case gamelogic.WarOutcomeOpponentWon:
+			return pubsub.Ack
+		case gamelogic.WarOutcomeYouWon:
+			return pubsub.Ack
+		}
+		fmt.Print("error: unknown war outcome")
 		return pubsub.NackDiscard
 	}
 }
