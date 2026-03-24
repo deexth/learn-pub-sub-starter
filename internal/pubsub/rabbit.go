@@ -61,7 +61,9 @@ func DeclareAndBind(
 		isTransient = true
 	}
 
-	queue, err := ch.QueueDeclare(queueName, isDirect, isTransient, isTransient, false, nil)
+	queue, err := ch.QueueDeclare(queueName, isDirect, isTransient, isTransient, false, amqp.Table{
+		"x-dead-letter-exchange": "peril_dlx",
+	})
 	if err != nil {
 		return nil, amqp.Queue{}, fmt.Errorf("issue creating queue: %v", err)
 	}
