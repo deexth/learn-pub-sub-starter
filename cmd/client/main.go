@@ -80,7 +80,7 @@ func main() {
 		routing.WarRecognitionsPrefix,
 		routing.WarRecognitionsPrefix+".*",
 		pubsub.Durable,
-		handlerWar(gs),
+		handlerWar(gs, ch),
 	)
 	if err != nil {
 		log.Fatal(err)

@@ -2,7 +2,9 @@
 package pubsub
 
 import (
+	"bytes"
 	"context"
+	"encoding/gob"
 	"encoding/json"
 	"fmt"
 
@@ -24,6 +26,25 @@ const (
 	Transient SimpleQueueType = "transient"
 )
 
+func PublishGob[T any](ch *amqp.Channel, exchange, key string, val T) error {
+	var newBuffer bytes.Buffer
+	enc := gob.NewEncoder(&newBuffer)
+	err := enc.Encode(val)
+	if err != nil {
+		return fmt.Errorf("issue encode to gob: %v", err)
+	}
+
+	err = ch.PublishWithContext(context.Background(), exchange, key, false, false, amqp.Publishing{
+		ContentType: "application/gob",
+		Body:        newBuffer.Bytes(),
+	})
+	if err != nil {
+		return fmt.Errorf("issue publishing gob from channel: %v", err)
+	}
+
+	return nil
+}
+
 func PublishJSON[T any](ch *amqp.Channel, exchange, key string, val T) error {
 	data, err := json.Marshal(val)
 	if err != nil {
@@ -35,7 +56,7 @@ func PublishJSON[T any](ch *amqp.Channel, exchange, key string, val T) error {
 		Body:        data,
 	})
 	if err != nil {
-		return fmt.Errorf("issue publishing from the channel: %v", err)
+		return fmt.Errorf("issue publishing json from the channel: %v", err)
 	}
 
 	return nil
@@ -75,6 +96,15 @@ func DeclareAndBind(
 
 	return ch, queue, nil
 }
+
+func SubscribeGob[T any](
+	conn *amqp.Connection,
+	exchange,
+	queueName,
+	key string,
+	queueType SimpleQueueType,
+	handler func(T) AckType,
+)
 
 func SubscribeJSON[T any](
 	conn *amqp.Connection,
