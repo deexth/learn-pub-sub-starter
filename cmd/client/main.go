@@ -123,7 +123,25 @@ func main() {
 		case "help":
 			gamelogic.PrintClientHelp()
 		case "spam":
-			fmt.Println("Spamming not allowed yet!")
+			spamNum, err := handlerSpam(inputs)
+			if err != nil {
+				fmt.Println(err)
+				continue
+			}
+
+			// for i := 0; i < spamNum; i++
+			for range spamNum {
+				maliciousLog := gamelogic.GetMaliciousLog()
+				err = publishGob(
+					gs.GetUsername(),
+					maliciousLog,
+					ch,
+				)
+				if err != nil {
+					fmt.Println(err)
+					continue
+				}
+			}
 		case "quit":
 			gamelogic.PrintQuit()
 			return

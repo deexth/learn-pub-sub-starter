@@ -97,6 +97,29 @@ func DeclareAndBind(
 	return ch, queue, nil
 }
 
+func SubscribeJSON[T any](
+	conn *amqp.Connection,
+	exchange,
+	queueName,
+	key string,
+	queueType SimpleQueueType,
+	handler func(T) AckType,
+) error {
+	return subscribe[T](
+		conn,
+		exchange,
+		queueName,
+		key,
+		queueType,
+		handler,
+		func(data []byte) (T, error) {
+			var target T
+			err := json.Unmarshal(data, &target)
+			return target, err
+		},
+	)
+}
+
 func SubscribeGob[T any](
 	conn *amqp.Connection,
 	exchange,
@@ -104,55 +127,73 @@ func SubscribeGob[T any](
 	key string,
 	queueType SimpleQueueType,
 	handler func(T) AckType,
-)
-
-func SubscribeJSON[T any](
-	conn *amqp.Connection,
-	exchange,
-	queueName,
-	key string,
-	queueType SimpleQueueType, // an enum to represent "durable" or "transient"
-	handler func(T) AckType,
 ) error {
-	ch, queue, err := DeclareAndBind(
+	return subscribe[T](
 		conn,
 		exchange,
 		queueName,
 		key,
 		queueType,
+		handler,
+		func(data []byte) (T, error) {
+			buffer := bytes.NewBuffer(data)
+			decoder := gob.NewDecoder(buffer)
+			var target T
+			err := decoder.Decode(&target)
+			return target, err
+		},
 	)
+}
+
+func subscribe[T any](
+	conn *amqp.Connection,
+	exchange,
+	queueName,
+	key string,
+	queueType SimpleQueueType,
+	handler func(T) AckType,
+	unmarshaller func([]byte) (T, error),
+) error {
+	ch, queue, err := DeclareAndBind(conn, exchange, queueName, key, queueType)
 	if err != nil {
-		return err
+		return fmt.Errorf("could not declare and bind queue: %v", err)
 	}
 
-	ampqDeliveryChan, err := ch.Consume(queue.Name, "", false, false, false, false, nil)
+	err = ch.Qos(10, 0, false)
 	if err != nil {
-		return fmt.Errorf("issue getting amqp.Delivery chan from ch.consume: %v", err)
+		return fmt.Errorf("issue using channel.Qos: %v", err)
+	}
+
+	msgs, err := ch.Consume(
+		queue.Name, // queue
+		"",         // consumer
+		false,      // auto-ack
+		false,      // exclusive
+		false,      // no-local
+		false,      // no-wait
+		nil,        // args
+	)
+	if err != nil {
+		return fmt.Errorf("could not consume messages: %v", err)
 	}
 
 	go func() {
 		defer ch.Close()
-		for c := range ampqDeliveryChan {
-			var data T
-			err = json.Unmarshal(c.Body, &data)
+		for msg := range msgs {
+			target, err := unmarshaller(msg.Body)
 			if err != nil {
-				fmt.Printf("couldn't Unmarshal %s", c.MessageId)
+				fmt.Printf("could not unmarshal message: %v\n", err)
 				continue
 			}
-
-			switch handler(data) {
+			switch handler(target) {
 			case Ack:
-				c.Ack(false)
-				fmt.Print("Ack")
+				msg.Ack(false)
 			case NackDiscard:
-				c.Nack(false, false)
-				fmt.Print("Nack discard")
+				msg.Nack(false, false)
 			case NackRequeue:
-				c.Nack(false, true)
-				fmt.Print("Nack requeue")
+				msg.Nack(false, true)
 			}
 		}
 	}()
-
 	return nil
 }

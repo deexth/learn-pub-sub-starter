@@ -2,6 +2,7 @@ package main
 
 import (
 	"fmt"
+	"strconv"
 	"time"
 
 	"github.com/bootdotdev/learn-pub-sub-starter/internal/gamelogic"
@@ -116,4 +117,18 @@ func publishGob(username, msg string, ch *amqp.Channel) error {
 	}
 
 	return nil
+}
+
+func handlerSpam(inputs []string) (int, error) {
+	if len(inputs) < 2 {
+		fmt.Println("usage: spam <n>")
+		return 0, nil
+	}
+
+	spamNum, err := strconv.ParseInt(inputs[1], 10, 64)
+	if err != nil {
+		return 0, fmt.Errorf("no number provided, issue converting 2nd value to int: %v", err)
+	}
+
+	return int(spamNum), err
 }
